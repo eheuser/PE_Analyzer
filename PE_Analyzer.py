@@ -115,66 +115,69 @@ def MultiByteXor(sample):
     path = directory + '/'
   mz     = re.compile('\\x4D\\x5A\\x90')
   mz_len = len(sample)
-  keys   = {}
-  for i in range(0, len(sample), 4):
-    chunk = struct.unpack('>I', sample[i:i+4])
-    if chunk[0] not in keys:
-      keys[chunk[0]] = 1
-    else:
-      keys[chunk[0]] = keys[chunk[0]] + 1
+  buf    = 4096
+  iters  = int(mz_len/buf)
+  for i in range(0, iters):
+    keys    = {}
+    segment = sample[i*buf:i*buf+buf] 
+    for a in range(0, len(segment), 4):
+      chunk = struct.unpack('>I', segment[a:a+4])
+      if chunk[0] not in keys:
+        keys[chunk[0]] = 1
+      else:
+        keys[chunk[0]] = keys[chunk[0]] + 1
 
-  max_val = 0
-  pos_key = 0
-  for key, value in keys.iteritems():
-    if value > max_val:
-      max_val = value
-      pos_key = key
-
-  ror = lambda val, r_bits, max_bits: \
-        ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
-        (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
-
-  '''
-  Loop over the rotate bits in increments of 4.
-  '''
-  for k in range(0, 32, 4):
-    xor_key = ror(pos_key, k, 32)
-    decoded = ''
-    for i in range(0, len(sample), 4):
-      chunk    = struct.unpack('>I', sample[i:i+4])
-      cleart   = chunk[0] ^ xor_key
-      decoded  += struct.pack('>I', cleart)
+    max_val = 0
+    pos_key = 0
+    for key, value in keys.iteritems():
+      if value > max_val:
+        max_val = value
+        pos_key = key
+    ror = lambda val, r_bits, max_bits: \
+          ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
+          (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
 
     '''
-    MZ header is searched for throughout the binary from 0x0 - 0xFF.
-    The binary object is then sliced and written to disk to test
-    with the pefile library for a valid PE.  If that's found, the PE
-    is trimmed of overlay data so hashes can be queried for.
+    Loop over the rotate bits in increments of 8.
     '''
+    for k in range(0, 32, 8):
+      xor_key = ror(pos_key, k, 32)
+      decoded = ''
+      for i in range(0, len(sample), 4):
+        chunk    = struct.unpack('>I', sample[i:i+4])
+        cleart   = chunk[0] ^ xor_key
+        decoded  += struct.pack('>I', cleart)
 
-    for mz_offset in re.finditer(mz, decoded):
-      if mz_offset.start() > 0:
-        blob = decoded[mz_offset.start():mz_len]
-        try:
-          f      = open(path + 'blob.tmp', 'wb')
-          f.write(blob)
-          f.close()
-          pe     = pefile.PE(path + 'blob.tmp')
-          offset = pe.sections[-1].PointerToRawData + pe.sections[-1].SizeOfRawData
-          new_mz = blob[:offset]
-          os.remove(path + 'blob.tmp')
-        except:
-          os.remove(path + 'blob.tmp')
-          continue
-        ext      = GetExt(pe)
-        checksum = hashlib.md5(new_mz).hexdigest()
-        '''
-        Only write and alert if file doesn't exist.
-        '''
-        if not os.path.isfile(path + checksum + ext):
-          f = open(path + checksum + ext, 'wb')
-          f.write(new_mz)
-          print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
+      '''
+      MZ header is searched for throughout the binary from 0x0 - 0xFF.
+      The binary object is then sliced and written to disk to test
+      with the pefile library for a valid PE.  If that's found, the PE
+      is trimmed of overlay data so hashes can be queried for.
+      '''
+
+      for mz_offset in re.finditer(mz, decoded):
+        if mz_offset.start() > 0:
+          blob = decoded[mz_offset.start():mz_len]
+          try:
+            f      = open(path + 'blob.tmp', 'wb')
+            f.write(blob)
+            f.close()
+            pe     = pefile.PE(path + 'blob.tmp')
+            offset = pe.sections[-1].PointerToRawData + pe.sections[-1].SizeOfRawData
+            new_mz = blob[:offset]
+            os.remove(path + 'blob.tmp')
+          except:
+            os.remove(path + 'blob.tmp')
+            continue
+          ext      = GetExt(pe)
+          checksum = hashlib.md5(new_mz).hexdigest()
+          '''
+          Only write and alert if file doesn't exist.
+          '''
+          if not os.path.isfile(path + checksum + ext):
+            f = open(path + checksum + ext, 'wb')
+            f.write(new_mz)
+            print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
 
 def GetExt(pe):
   '''
