@@ -82,7 +82,7 @@ def main(exe):
     print 'This application only supports analyzing Windows PEs'
 
 def CarveEXE(sample):
-  directory = directory = os.path.dirname(os.path.abspath(__file__))
+  directory = os.path.dirname(os.path.abspath(__file__))
   if os.name == 'nt':
     path = directory + '\\'
   elif os.name == 'posix':
