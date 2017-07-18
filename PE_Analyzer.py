@@ -6,6 +6,7 @@ import time
 import hashlib
 import re
 import string
+import struct
 try:
   import pefile
   import ssdeep
@@ -94,13 +95,15 @@ def Main(exe):
     DomainHunter(sample)
 
     print '# Carving Additional PEs'
-    CarveEXE(sample)
-
+    MultiByteXor(sample)
   else:
     print 'This application only supports analyzing Windows PEs'
 
-def CarveEXE(sample):
+def MultiByteXor(sample):
   '''
+  Find most commmon 4 byte sequence and ROR through it
+  looking for MZ headers and valid PE's.  The sequence
+  is also rotated right [ ROR ] with the lambda, below.
   Find the current directory and OS version so we can create
   the appropriate path for our temp file that will contain
   carved PEs
@@ -110,19 +113,48 @@ def CarveEXE(sample):
     path = directory + '\\'
   elif os.name == 'posix':
     path = directory + '/'
-  '''
-  MZ header is searched for throughout the binary from 0x0 - 0xFF.
-  The binary object is then sliced and written to disk to test
-  with the pefile library for a valid PE.  If that's found, the PE
-  is trimmed of overlay data so hashes can be queried for.
-  '''
   mz     = re.compile('\\x4D\\x5A\\x90')
   mz_len = len(sample)
-  for key in range(0,0x100):
-    binary = xor(sample, key)
-    for mz_offset in re.finditer(mz, binary):
+  keys   = {}
+  for i in range(0, len(sample), 4):
+    chunk = struct.unpack('>I', sample[i:i+4])
+    if chunk[0] not in keys:
+      keys[chunk[0]] = 1
+    else:
+      keys[chunk[0]] = keys[chunk[0]] + 1
+
+  max_val = 0
+  pos_key = 0
+  for key, value in keys.iteritems():
+    if value > max_val:
+      max_val = value
+      pos_key = key
+
+  ror = lambda val, r_bits, max_bits: \
+        ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
+        (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
+
+  '''
+  Loop over the rotate bits in increments of 4.
+  '''
+  for k in range(0, 32, 4):
+    xor_key = ror(pos_key, k, 32)
+    decoded = ''
+    for i in range(0, len(sample), 4):
+      chunk    = struct.unpack('>I', sample[i:i+4])
+      cleart   = chunk[0] ^ xor_key
+      decoded  += struct.pack('>I', cleart)
+
+    '''
+    MZ header is searched for throughout the binary from 0x0 - 0xFF.
+    The binary object is then sliced and written to disk to test
+    with the pefile library for a valid PE.  If that's found, the PE
+    is trimmed of overlay data so hashes can be queried for.
+    '''
+
+    for mz_offset in re.finditer(mz, decoded):
       if mz_offset.start() > 0:
-        blob = binary[mz_offset.start():mz_len]
+        blob = decoded[mz_offset.start():mz_len]
         try:
           f      = open(path + 'blob.tmp', 'wb')
           f.write(blob)
@@ -136,13 +168,17 @@ def CarveEXE(sample):
           continue
         ext      = GetExt(pe)
         checksum = hashlib.md5(new_mz).hexdigest()
-        f        = open(path + checksum + ext, 'wb')
-        f.write(new_mz)
-        print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(key) + '] and MD5 of ' + str(checksum)
+        '''
+        Only write and alert if file doesn't exist.
+        '''
+        if not os.path.isfile(path + checksum + ext):
+          f = open(path + checksum + ext, 'wb')
+          f.write(new_mz)
+          print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
 
 def GetExt(pe):
   '''
-  Qeury for and return extension type for quick identification.
+  Query for and return extension type for quick identification.
   '''
   if pe.is_dll() == True:
     return '.dll_'
@@ -157,7 +193,7 @@ def DomainHunter(sample):
   ''' 
   More complicated Regexes with capture groups and better logic were attempted.
   This started to exhibit O(N^2) behavior and was simplified.  The Regex below
-  exlcudes 2 periods together in the initial string [ .. ] then looks for a 
+  excludes 2 periods together in the initial string [ .. ] then looks for a 
   valid starting character for the domain and is anchored by a TLD.
   '''
   regex = re.compile('(?!\.\.)([a-zA-Z0-9_][a-zA-Z0-9\.\-\_]{6,255})\.(com|net|org|co|biz|info|me|us|uk|ca|de|jp|au|fr|ru|ch|it|nl|se|no|es|su|mobi)')
@@ -194,7 +230,7 @@ def FindXorStrings(sample, regex):
       for match in re.finditer(entry, binary):
         s = match.start()
         e = match.end()
-        print '  XOR Key [' + hex(key) + '] found at offset ' + hex(s) + ' --> ' + binary[s:e]
+        print '  String found at offset ' + hex(s) + ' with XOR Key [' + hex(key) + '] --> ' + binary[s:e]
 
 def xor(data, key):
   '''
