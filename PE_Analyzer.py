@@ -11,7 +11,7 @@ import pyimpfuzzy
 import socket
 import time
 
-def main(exe):
+def Main(exe):
   ape = False
   try:
     ape = pefile.PE(exe, fast_load = True)
@@ -105,13 +105,13 @@ def CarveEXE(sample):
         except:
           os.remove(path + 'blob.tmp')
           continue
-        ext      = getExt(pe)
+        ext      = GetExt(pe)
         checksum = hashlib.md5(new_mz).hexdigest()
         f        = open(path + checksum + ext, 'wb')
         f.write(new_mz)
         print '  Found embedded PE at offset ' + str(mz_offset.start()) + ' with XOR key [' + hex(key) + '] and MD5 of ' + str(checksum)
 
-def getExt(pe):
+def GetExt(pe):
   if pe.is_dll() == True:
     return '.dll_'
   if pe.is_driver() == True:
@@ -160,7 +160,7 @@ def ReadSample(exe):
 
 if __name__ == "__main__":
   if len(sys.argv) == 2:
-    main(sys.argv[1])
+    Main(sys.argv[1])
   else:
     print "Requires path to a file to be analyzed like\nPE_Analyzer.py foo.exe"
 
