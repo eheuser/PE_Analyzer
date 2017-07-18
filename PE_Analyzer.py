@@ -21,22 +21,22 @@ def main(exe):
     pe          = pefile.PE(exe)
     sample      = ReadSample(exe)
     sample_type = 'exe'
-    print '#MD5              : ' + str(hashlib.md5(sample).hexdigest())
-    print '#SHA1             : ' + str(hashlib.sha1(sample).hexdigest())
-    print '#SHA156           : ' + str(hashlib.sha256(sample).hexdigest())
-    print '#SSDEEP           : ' + str(ssdeep.hash(sample))
-    print '#Import Hash      : ' + str(pe.get_imphash())
-    print '#Fuzzy Import Hash: ' + str(pyimpfuzzy.get_impfuzzy(exe))
-    print '#File Size        : ' + str(len(sample))
-    print '#Major Version    : ' + str(pe.OPTIONAL_HEADER.MajorOperatingSystemVersion)
-    print '#Minor Version    : ' + str(pe.OPTIONAL_HEADER.MinorOperatingSystemVersion)
-    print '#Compile time     : ' + str(time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(pe.FILE_HEADER.TimeDateStamp)))
+    print '# MD5              : ' + str(hashlib.md5(sample).hexdigest())
+    print '# SHA1             : ' + str(hashlib.sha1(sample).hexdigest())
+    print '# SHA256           : ' + str(hashlib.sha256(sample).hexdigest())
+    print '# SSDEEP           : ' + str(ssdeep.hash(sample))
+    print '# Import Hash      : ' + str(pe.get_imphash())
+    print '# Fuzzy Import Hash: ' + str(pyimpfuzzy.get_impfuzzy(exe))
+    print '# File Size        : ' + str(len(sample))
+    print '# Major Version    : ' + str(pe.OPTIONAL_HEADER.MajorOperatingSystemVersion)
+    print '# Minor Version    : ' + str(pe.OPTIONAL_HEADER.MinorOperatingSystemVersion)
+    print '# Compile time     : ' + str(time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(pe.FILE_HEADER.TimeDateStamp)))
     mime_magic                   = magic.Magic(mime=True)
-    print '#MIME Type        : ' + str(mime_magic.from_buffer(sample))
+    print '# MIME Type        : ' + str(mime_magic.from_buffer(sample))
     full_magic                   = magic.Magic()
-    print '#File Magic       : ' + str(full_magic.from_buffer(sample))
+    print '# File Magic       : ' + str(full_magic.from_buffer(sample))
 
-    print '#PE Sections      : '
+    print '# PE Sections      : '
     for section in pe.sections:
       print '  Name  : ' + str(section.Name)
       print '  MD5   : ' + str(section.get_hash_md5())
@@ -45,41 +45,41 @@ def main(exe):
       endofdata = start + section.SizeOfRawData
       print '  SSDEEP: ' + str(ssdeep.hash(section.get_data(start)[:endofdata]))
       print ''
-    print '#Imports:'
+    print '# Imports:'
     for entry in pe.DIRECTORY_ENTRY_IMPORT:
       for imp in entry.imports:
         print '  ' + str(entry.dll) + '!' + str(imp.name)
 
-    print '#Exports:'
+    print '# Exports:'
     try:
       for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
         print '  ' + str(exp.name)
     except:
-      print '<none>'
+      print '  <none>'
       pass
     regex = ['[a-zA-Z0-9-\s\\\.\:]+\.pdb', \
              '(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})', \
              '[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})', \
              '[A-z|a-z|0-9]{1,}\.(dll|scr|exe|bat)']
 
-    print '#Cleartext Interesting Strings'
+    print '# Cleartext Interesting Strings'
     FindStrings(sample, regex)
 
-    print '#XOR Encdoded Interesting Strings'
+    print '# XOR Encdoded Interesting Strings'
     for key in range(1,0x100):
       if key == 0x20:
         continue
       binary = xor(sample, key)
       FindXorStrings(binary, key, regex)
 
-    print '#Possible Domain Names'
+    print '# Possible Domain Names'
     DomainHunter(sample)
 
-    print '#Carving Additional PEs'
+    print '# Carving Additional PEs'
     CarveEXE(sample)
 
   else:
-    print "This application only supports analyzing Windows PEs"
+    print 'This application only supports analyzing Windows PEs'
 
 def CarveEXE(sample):
   directory = directory = os.path.dirname(os.path.abspath(__file__))
@@ -137,14 +137,14 @@ def FindStrings(binary, regex):
     for match in re.finditer(entry, binary):
       s = match.start()
       e = match.end()
-      print "  Found at offset " + hex(s) + " --> " + binary[s:e]
+      print '  Found at offset ' + hex(s) + ' --> ' + binary[s:e]
 
 def FindXorStrings(binary, key, regex):
   for entry in regex:
     for match in re.finditer(entry, binary):
       s = match.start()
       e = match.end()
-      print "  XOR Key [" + hex(key) + "] found at offset " + hex(s) + " --> " + binary[s:e]
+      print '  XOR Key [' + hex(key) + '] found at offset ' + hex(s) + ' --> ' + binary[s:e]
 
 def xor(data, key):
   decode = ''
