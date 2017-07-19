@@ -113,10 +113,11 @@ def MultiByteXor(sample):
     path = directory + '\\'
   elif os.name == 'posix':
     path = directory + '/'
-  mz     = re.compile('\\x4D\\x5A\\x90')
-  mz_len = len(sample)
-  buf    = 4096
-  iters  = int(mz_len/buf)
+  mz        = re.compile('\\x4D\\x5A\\x90')
+  mz_len    = len(sample)
+  buf       = 4096
+  iters     = int(mz_len/buf)
+  key_chain = []
   for i in range(0, iters):
     keys    = {}
     segment = sample[i*buf:i*buf+buf] 
@@ -139,9 +140,16 @@ def MultiByteXor(sample):
 
     '''
     Loop over the rotate bits in increments of 8.
+    The key_chain makes sure we don't try the same
+    XOR key permutation more than once to save some
+    CPU cycles.
     '''
     for k in range(0, 32, 8):
       xor_key = ror(pos_key, k, 32)
+      if xor_key in key_chain:
+        continue
+      else:
+        key_chain.append(xor_key)
       decoded = ''
       for i in range(0, len(sample), 4):
         chunk    = struct.unpack('>I', sample[i:i+4])
@@ -149,7 +157,7 @@ def MultiByteXor(sample):
         decoded  += struct.pack('>I', cleart)
 
       '''
-      MZ header is searched for throughout the binary from 0x0 - 0xFF.
+      MZ header is searched for throughout the binary.
       The binary object is then sliced and written to disk to test
       with the pefile library for a valid PE.  If that's found, the PE
       is trimmed of overlay data so hashes can be queried for.
