@@ -12,13 +12,17 @@ try:
   import ssdeep
   import magic
   import pyimpfuzzy
+  import yara
 except ImportError:
   print '''
 The following non-standard packages are required:
+
 pefile
 ssdeep
 magic
 pyimpfuzzy
+yara
+
 These are generall availble via pip:
 sudo pip install <foo>
         '''
@@ -74,6 +78,11 @@ def Main(exe):
       pass
 
     '''
+    Look for Crpyto Constants with YARA
+    '''
+    print '#  Scanning with YARA signatures'
+    ScanWithYARA(sample)
+    '''
     The following functions look for cleartext and XOR encoded strings
     of interest [domains, IP's, email addresses, pdb paths, executables]
     and print them in seperate sections.  The last function will attempt
@@ -98,6 +107,30 @@ def Main(exe):
     MultiByteXor(sample)
   else:
     print 'This application only supports analyzing Windows PEs'
+
+def ScanWithYARA(sample):
+  '''
+  By default this package includes crpyto constant signatures.
+  The user is also encouraged to drop their own YARA signatures
+  into the same directory as the script with a .yar extension,
+  these will also be read and applied to the sample analysis.
+  '''
+  
+  directory = os.path.dirname(os.path.abspath(__file__))
+  if os.name == 'nt':
+    path = directory + '\\'
+  elif os.name == 'posix':
+    path = directory + '/'
+  for sig in os.listdir(path):
+    if sig.endswith('.yar'):
+      print '  Loaded ruleset: ' + str(sig)
+      f       = open(path + sig, 'rb')
+      text    = f.read()
+      f.close()
+      rules   = yara.compile(source=text)
+      matches = rules.match(data=sample)
+      for match in matches:
+        print '  Sample matched YARA rule: ' + str(match)
 
 def MultiByteXor(sample):
   '''
@@ -271,6 +304,7 @@ and print them out.  Items analyzed:
 -Hashes
 -Import, Exports and Import hash
 -Static details such as compile time and version information
+-Custom YARA signatures as well as included crypto constant sigs
 -Fuzzy Hashes for PE, Imports and Sections
 -Cleartext and XOR encoded strings of interest
 -Cleartext and XOR encoded PE's embedded within sample 
