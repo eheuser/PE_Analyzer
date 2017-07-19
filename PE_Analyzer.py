@@ -154,7 +154,10 @@ def MultiByteXor(sample):
   key_chain = []
   for i in range(0, iters):
     keys    = {}
-    segment = sample[i*buf:i*buf+buf] 
+    if i > 0:
+      segment = sample[i*buf-4:i*buf+buf] 
+    else:
+      segment = sample[i*buf:i*buf+buf]
     for a in range(0, len(segment), 4):
       chunk = struct.unpack('>I', segment[a:a+4])
       if chunk[0] not in keys:
@@ -219,7 +222,7 @@ def MultiByteXor(sample):
           if not os.path.isfile(path + checksum + ext):
             f = open(path + checksum + ext, 'wb')
             f.write(new_mz)
-            print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
+          print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
 
 def GetExt(pe):
   '''
