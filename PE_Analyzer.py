@@ -171,9 +171,6 @@ def MultiByteXor(sample):
       if value > max_val:
         max_val = value
         pos_key = key
-    ror = lambda val, r_bits, max_bits: \
-          ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
-          (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
 
     '''
     Loop over the rotate bits in increments of 8.
@@ -223,6 +220,28 @@ def MultiByteXor(sample):
             f = open(path + checksum + ext, 'wb')
             f.write(new_mz)
           print '  Found embedded PE at offset ' + hex(mz_offset.start()) + ' with XOR key [' + hex(xor_key) + '] and MD5 of ' + str(checksum)
+
+def ror(val, r_bits, max_bits = 32):
+  if max_bits == 32:
+    mask = 0xFFFFFFFF
+  elif max_bits == 64:
+    mask =  0xFFFFFFFFFFFFFFFF
+  left_shift  = max_bits - r_bits
+  right_shift = max_bits - left_shift
+  m_byte      = (val << left_shift) & mask
+  l_bytes     = val >> right_shift
+  return m_byte | l_bytes
+
+def rol(val, r_bits, max_bits = 32):
+  if max_bits == 32:
+    mask = 0xFFFFFFFF
+  elif max_bits == 64:
+    mask =  0xFFFFFFFFFFFFFFFF
+  right_shift = max_bits - r_bits
+  left_shift  = max_bits - right_shift
+  m_byte      = (val << left_shift) & mask
+  l_bytes     = val >> right_shift
+  return m_byte | l_bytes
 
 def GetExt(pe):
   '''
