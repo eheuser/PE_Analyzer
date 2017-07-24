@@ -281,7 +281,7 @@ def FindStrings(sample, regex):
     for match in re.finditer(entry, sample):
       s = match.start()
       e = match.end()
-      print '  Found at offset ' + hex(s) + ' --> ' + sample[s:e]
+      print '  String found at offset ' + hex(s) + ' --> ' + sample[s:e]
 
 def FindXorStrings(sample, regex):
   '''
