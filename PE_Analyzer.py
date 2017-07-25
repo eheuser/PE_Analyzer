@@ -106,6 +106,9 @@ def Main(exe):
 
     print '# Carving Additional PEs'
     MultiByteXor(sample)
+
+    print '# Looking for Common Shellcode Techniques'
+    ShellcodeHunter(sample)
   else:
     print 'This application only supports analyzing Windows PEs'
 
@@ -256,6 +259,65 @@ def GetExt(pe):
   else:
     return '.bin_'
   
+def ShellcodeHunter(sample):
+  func     = [ 'kernel32', \
+               'ntdll', \
+               'ntoskrnl', \
+               'exallocpool', \
+               'exfreepool', \
+               'zwquerysysteminformation', \
+               'winexec', \
+               'ws2_32', \
+               'wsastartup', \
+               'writefile', \
+               'getprocaddress', \
+               'loadlibrary', \
+               'createevent', \
+               'physicaldrive' ]
+
+  win_hash = { '\\x00\\x6B\\x80\\x29': 'ws2_32.dll!WSAStartup', \
+               '\\xE0\\xDF\\x0F\\xEA': 'ws2_32.dll!WSASocketA', \
+               '\\x67\\x37\\xDB\\xC2': 'ws2_32.dll!bind', \
+               '\\xFF\\x38\\xE9\\xB7': 'ws2_32.dll!listen', \
+               '\\xE1\\x3B\\xEC\\x74': 'ws2_32.dll!accept', \
+               '\\x61\\x4D\\x6E\\x75': 'ws2_32.dll!closesocket', \
+               '\\x61\\x74\\xA5\\x99': 'ws2_32.dll!connect', \
+               '\\x5F\\xC8\\xD9\\x02': 'ws2_32.dll!recv', \
+               '\\x5F\\x38\\xEB\\xC2': 'ws2_32.dll!send', \
+               '\\x5B\\xAE\\x57\\x2D': 'kernel32.dll!WriteFile', \
+               '\\x4F\\xDA\\xF6\\xDA': 'kernel32.dll!CreateFileA', \
+               '\\x13\\xDD\\x2E\\xD7': 'kernel32.dll!DeleteFileA', \
+               '\\xE4\\x49\\xF3\\x30': 'kernel32.dll!GetTempPathA', \
+               '\\x52\\x87\\x96\\xC6': 'kernel32.dll!CloseHandle', \
+               '\\x86\\x3F\\xCC\\x79': 'kernel32.dll!CreateProcessA', \
+               '\\xE5\\x53\\xA4\\x58': 'kernel32.dll!VirtualAlloc', \
+               '\\x30\\x0F\\x2F\\x0B': 'kernel32.dll!VirtualFree', \
+               '\\x07\\x26\\x77\\x4C': 'kernel32.dll!LoadLibraryA', \
+               '\\x78\\x02\\xF7\\x49': 'kernel32.dll!GetProcAddress', \
+               '\\x60\\x1D\\x87\\x08': 'kernel32.dll!WaitForSingleObject', \
+               '\\x87\\x6F\\x8B\\x31': 'kernel32.dll!WinExec', \
+               '\\x9D\\xBD\\x95\\xA6': 'kernel32.dll!GetVersion', \
+               '\\xEA\\x32\\x0E\\xFE': 'kernel32.dll!SetUnhandledExceptionFilter', \
+               '\\x56\\xA2\\xB5\\xF0': 'kernel32.dll!ExitProcess', \
+               '\\x0A\\x2A\\x1D\\xE0': 'kernel32.dll!ExitThread', \
+               '\\x6F\\x72\\x13\\x47': 'ntdll.dll!RtlExitUserThread', \
+               '\\x23\\xE3\\x84\\x27': 'advapi32.dll!RevertToSelf' }
+
+  for key in range(0,0x100):
+    if key == 0x20:
+      continue
+    binary  = xor(sample, key)
+    if key > 1:
+      for entry in func:
+        for match in re.finditer(entry, binary, flags=re.IGNORECASE):
+          s = match.start()
+          e = match.end()
+          print '  Potential API lookup found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(binary[s:e])
+    for k, v in win_hash.iteritems():
+      for match in re.finditer(k, binary):
+        s = match.start()
+        print '  Potential API Hash reference found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(v)
+        
 def DomainHunter(sample):
   ''' 
   More complicated Regexes with capture groups and better logic were attempted.
