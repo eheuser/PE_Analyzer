@@ -7,6 +7,9 @@ import hashlib
 import re
 import string
 import struct
+from itertools import repeat
+from multiprocessing import Pool
+from multiprocessing import Process
 try:
   import pefile
   import ssdeep
@@ -144,6 +147,10 @@ def MultiByteXor(sample):
   Find the current directory and OS version so we can create
   the appropriate path for our temp file that will contain
   carved PEs
+
+  This is already fairly fast and adding multiprocessing
+  would negate the advantages of keeping the key_chain
+  optimization which could actually slow it down.
   '''
   directory = os.path.dirname(os.path.abspath(__file__))
   if os.name == 'nt':
@@ -268,7 +275,6 @@ def ShellcodeHunter(sample):
   are skipped for the ASCII search.  The entire rnage of
   0x0-0xff is searched for these API hashes, however.
   '''
-
   func     = [ 'kernel32', \
                'ntdll', \
                'ntoskrnl', \
@@ -312,18 +318,22 @@ def ShellcodeHunter(sample):
                '\\x6F\\x72\\x13\\x47': 'ntdll.dll!RtlExitUserThread', \
                '\\x23\\xE3\\x84\\x27': 'advapi32.dll!RevertToSelf' }
 
-  for key in range(0,0x100):
-    binary  = xor(sample, key)
-    if key != 0 and key != 0x20:
-      for entry in func:
-        for match in re.finditer(entry, binary, flags=re.IGNORECASE):
-          s = match.start()
-          e = match.end()
-          print '  Potential API lookup found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(binary[s:e])
-    for k, v in win_hash.iteritems():
-      for match in re.finditer(k, binary):
+  xor_key = range(0, 0x100)
+  p = Pool()
+  p.map(XorShellcode, zip(xor_key, repeat(sample), repeat(func), repeat(win_hash)))
+  
+def XorShellcode((key, sample, func, win_hash)):
+  binary  = xor(sample, key)
+  if key != 0x20 and key != 0:
+    for entry in func:
+      for match in re.finditer(entry, binary, flags=re.IGNORECASE):
         s = match.start()
-        print '  Potential API Hash reference found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(v)
+        e = match.end()
+        print '  Potential API lookup found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(binary[s:e])
+  for k, v in win_hash.iteritems():
+    for match in re.finditer(k, binary):
+      s = match.start()
+      print '  Potential API Hash reference found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(v)
         
 def DomainHunter(sample):
   ''' 
@@ -332,10 +342,14 @@ def DomainHunter(sample):
   excludes 2 periods together in the initial string [ .. ] then looks for a 
   valid starting character for the domain and is anchored by a TLD.
   '''
-  regex = re.compile('(?!\.\.)([a-zA-Z0-9_][a-zA-Z0-9\.\-\_]{6,255})\.(com|net|org|co|biz|info|me|us|uk|ca|de|jp|au|fr|ru|ch|it|nl|se|no|es|su|mobi)')
-  for key in range(0,0x100):
-    if key == 0x20:
-      continue
+  regex   = re.compile('(?!\.\.)([a-zA-Z0-9_][a-zA-Z0-9\.\-\_]{6,255})\.(com|net|org|co|biz|info|me|us|uk|ca|de|jp|au|fr|ru|ch|it|nl|se|no|es|su|mobi)')
+  xor_key = range(0, 0x100)
+  p = Pool()
+  p.map(XorDomains, zip(xor_key, repeat(sample), repeat(regex)))
+
+def XorDomains((key, sample, regex)):
+  if key != 0x20:
+    binary  = xor(sample, key)
     binary  = xor(sample, key)
     for match in re.finditer(regex, binary):
       s = match.start()
@@ -357,11 +371,13 @@ def FindXorStrings(sample, regex):
   The same as FindStrings except we rotate from 0x01 - 0xFF XOR keys
   before doing our Regex search.
   '''
-  for key in range(1,0x100):
-    if key == 0x20:
-      continue
-    binary = xor(sample, key)
+  xor_key = range(1, 0x100)
+  p = Pool()
+  p.map(XorString, zip(xor_key, repeat(sample), repeat(regex)))
 
+def XorString((key, sample, regex)):
+  binary = xor(sample, key)
+  if key != 0x20:
     for entry in regex:
       for match in re.finditer(entry, binary):
         s = match.start()
@@ -402,7 +418,7 @@ and print them out.  Items analyzed:
 -Cleartext and XOR encoded PE's embedded within sample 
 
 Requires path to a file to be analyzed like:
-  PE_Analyzer.py foo.exe
+  MP_PE_Analyzer.py foo.exe
             '''
     else:
       Main(sys.argv[1])
