@@ -272,6 +272,7 @@ def ShellcodeHunter(sample):
   func     = [ 'kernel32', \
                'ntdll', \
                'ntoskrnl', \
+               'msvbvm60', \
                'exallocpool', \
                'exfreepool', \
                'zwquerysysteminformation', \
@@ -323,7 +324,7 @@ def ShellcodeHunter(sample):
     for k, v in win_hash.iteritems():
       for match in re.finditer(k, binary):
         s = match.start()
-        print '  Potential API Hash reference found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(v)
+        print '  Potential API Hash reference found at offset ' + hex(s) + ' with XOR key [' + hex(key) + ']: ' + str(k) + ' ' + str(v)
         
 def DomainHunter(sample):
   ''' 
