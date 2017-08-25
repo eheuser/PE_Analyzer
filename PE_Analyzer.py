@@ -45,7 +45,10 @@ def Main(exe):
     print '# SHA256           : ' + str(hashlib.sha256(sample).hexdigest())
     print '# SSDEEP           : ' + str(ssdeep.hash(sample))
     print '# Import Hash      : ' + str(pe.get_imphash())
-    print '# Fuzzy Import Hash: ' + str(pyimpfuzzy.get_impfuzzy(exe))
+    try:
+      print '# Fuzzy Import Hash: ' + str(pyimpfuzzy.get_impfuzzy(exe))
+    except:
+      pass
     print '# File Size        : ' + str(len(sample))
     print '# Major Version    : ' + str(pe.OPTIONAL_HEADER.MajorOperatingSystemVersion)
     print '# Minor Version    : ' + str(pe.OPTIONAL_HEADER.MinorOperatingSystemVersion)
@@ -66,10 +69,12 @@ def Main(exe):
       print '  SSDEEP: ' + str(ssdeep.hash(section.get_data(start)[:endofdata]))
       print ''
     print '# Imports:'
-    for entry in pe.DIRECTORY_ENTRY_IMPORT:
-      for imp in entry.imports:
-        print '  ' + str(entry.dll) + '!' + str(imp.name)
-
+    try:
+      for entry in pe.DIRECTORY_ENTRY_IMPORT:
+        for imp in entry.imports:
+          print '  ' + str(entry.dll) + '!' + str(imp.name)
+    except:
+      pass
     print '# Exports:'
     try:
       for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
