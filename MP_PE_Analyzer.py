@@ -71,6 +71,24 @@ def Main(exe):
       endofdata = start + section.SizeOfRawData
       print '  SSDEEP: ' + str(ssdeep.hash(section.get_data(start)[:endofdata]))
       print ''
+    lang    = []
+    subLang = []
+    if hasattr(pe, 'DIRECTORY_ENTRY_RESOURCE'):
+      for resource_type in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        if hasattr(resource_type, 'directory'):
+          for resource_id in resource_type.directory.entries:
+            if hasattr(resource_id, 'directory'):
+              for resource_lang in resource_id.directory.entries:
+                language = pefile.LANG.get(resource_lang.data.lang, None)
+                sublanguage = pefile.get_sublang_name_for_lang(resource_lang.data.lang,
+                                       resource_lang.data.sublang)
+                lang.append(language)
+                subLang.append(sublanguage)
+    for l in set(lang):
+      print '# Compiled Language    : ' + str(l)
+    for sl in set(subLang):
+      print '# Compiled Sub-Language: ' +  str(sl)
+
     print '# Imports:'
     for entry in pe.DIRECTORY_ENTRY_IMPORT:
       for imp in entry.imports:
