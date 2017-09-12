@@ -76,9 +76,8 @@ def Main(exe):
           for resource_id in resource_type.directory.entries:
             if hasattr(resource_id, 'directory'):
               for resource_lang in resource_id.directory.entries:
-                language = pefile.LANG.get(resource_lang.data.lang, None)
-                sublanguage = pefile.get_sublang_name_for_lang(resource_lang.data.lang,
-                                       resource_lang.data.sublang)
+                language    = pefile.LANG.get(resource_lang.data.lang, None)
+                sublanguage = pefile.get_sublang_name_for_lang(resource_lang.data.lang, resource_lang.data.sublang)
                 lang.append(language)
                 subLang.append(sublanguage)
     for l in set(lang):

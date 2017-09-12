@@ -90,9 +90,13 @@ def Main(exe):
       print '# Compiled Sub-Language: ' +  str(sl)
 
     print '# Imports:'
-    for entry in pe.DIRECTORY_ENTRY_IMPORT:
-      for imp in entry.imports:
-        print '  ' + str(entry.dll) + '!' + str(imp.name)
+    try:
+      for entry in pe.DIRECTORY_ENTRY_IMPORT:
+        for imp in entry.imports:
+          print '  ' + str(entry.dll) + '!' + str(imp.name)
+    except:
+      print '  <none>'
+      pass
 
     print '# Exports:'
     try:
